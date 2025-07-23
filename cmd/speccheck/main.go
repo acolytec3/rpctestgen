@@ -9,10 +9,11 @@ import (
 )
 
 type Args struct {
-	SpecPath   string `arg:"--spec" help:"path to client binary" default:"openrpc.json"`
-	TestsRoot  string `arg:"--tests" help:"path to tests directory" default:"tests"`
-	TestsRegex string `arg:"--regexp" help:"regular expression to match tests to check" deafult:".*"`
-	Verbose    bool   `arg:"-v,--verbose" help:"verbosity level of rpctestgen"`
+	SpecPath     string `arg:"--spec" help:"path to client binary" default:"openrpc.json"`
+	TestsRoot    string `arg:"--tests" help:"path to tests directory" default:"tests"`
+	TestsRegex   string `arg:"--regexp" help:"regular expression to match tests to check" deafult:".*"`
+	Verbose      bool   `arg:"-v,--verbose" help:"verbosity level of rpctestgen"`
+	GenerateUrls bool   `arg:"-g,--generate-urls" help:"generate URLs for failed validations"`
 }
 
 func main() {
@@ -41,7 +42,7 @@ func run(args *Args) error {
 		return err
 	}
 
-	return checkSpec(methods, rts, re)
+	return checkSpec(methods, rts, re, args.GenerateUrls)
 }
 
 func exit(err error) {

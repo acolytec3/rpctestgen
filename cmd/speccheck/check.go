@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -10,9 +11,14 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
+// singleEscape applies url.QueryEscape once
+func singleEscape(s string) string {
+	return url.QueryEscape(s)
+}
+
 // checkSpec reads the schemas from the spec and test files, then validates
 // them against each other.
-func checkSpec(methods map[string]*methodSchema, rts []*roundTrip, re *regexp.Regexp) error {
+func checkSpec(methods map[string]*methodSchema, rts []*roundTrip, re *regexp.Regexp, generateUrls bool) error {
 	for _, rt := range rts {
 		method, ok := methods[rt.method]
 		if !ok {
@@ -37,6 +43,16 @@ func checkSpec(methods map[string]*methodSchema, rts []*roundTrip, re *regexp.Re
 				return fmt.Errorf("missing required parameter %s.param[%d]", rt.method, i)
 			}
 			if err := validate(&method.params[i].schema, rt.params[i], fmt.Sprintf("%s.param[%d]", rt.method, i)); err != nil {
+				if generateUrls {
+					schemaStr, _ := json.MarshalIndent(method.params[i].schema, "", "    ")
+					dataStr := string(rt.params[i])
+					urlStr := fmt.Sprintf(
+						"http://localhost:5173/#schema=%s&data=%s",
+						singleEscape(string(schemaStr)),
+						singleEscape(dataStr),
+					)
+					return fmt.Errorf("unable to validate parameter in %s: %s\nURL: %s", rt.name, err, urlStr)
+				}
 				return fmt.Errorf("unable to validate parameter in %s: %s", rt.name, err)
 			}
 		}
@@ -50,6 +66,16 @@ func checkSpec(methods map[string]*methodSchema, rts []*roundTrip, re *regexp.Re
 			fmt.Println(string(buf))
 			fmt.Println(string(rt.response.Result))
 			fmt.Println()
+			if generateUrls {
+				schemaStr, _ := json.MarshalIndent(method.result.schema, "", "    ")
+				dataStr := string(rt.response.Result)
+				urlStr := fmt.Sprintf(
+					"http://localhost:5173/#schema=%s&data=%s",
+					singleEscape(string(schemaStr)),
+					singleEscape(dataStr),
+				)
+				return fmt.Errorf("invalid result %s\n%#v\nURL: %s", rt.name, err, urlStr)
+			}
 			return fmt.Errorf("invalid result %s\n%#v", rt.name, err)
 		}
 	}
@@ -60,8 +86,8 @@ func checkSpec(methods map[string]*methodSchema, rts []*roundTrip, re *regexp.Re
 
 // validateParam validates the provided value against schema using the url base.
 func validate(schema *openrpc.JSONSchemaObject, val []byte, url string) error {
-	// Set $schema explicitly to force jsonschema to use draft 2019-09.
-	draft := openrpc.Schema("https://json-schema.org/draft/2019-09/schema")
+	// Set $schema explicitly to force jsonschema to use draft 7 following OpenRPC standard.
+	draft := openrpc.Schema("http://json-schema.org/draft-07/schema")
 	schema.Schema = &draft
 
 	// Compile schema.
