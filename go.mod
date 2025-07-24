@@ -1,4 +1,4 @@
-module github.com/lightclient/rpctestgen
+module github.com/acolytec3/rpctestgen
 
 go 1.23.0
 
